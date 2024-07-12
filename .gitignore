@@ -1,0 +1,7 @@
+dataset-anynet/*
+*.zip 
+checkpoint/* 
+*/__pycache__/* 
+results/*
+__pycache__/*
+dataset-finetune/*
