@@ -4,6 +4,7 @@ import os
 import shutil
 from glob import glob
 import utils_anynet
+import logging, coloredlogs
 
 # Define source folders
 DATASET_FOLDER = "dataset-anynet"
@@ -13,11 +14,11 @@ LEFT_DISPARITY_FOLDER = f"{DATASET_FOLDER}/disp_occ_0"
 
 # Define destination folders
 DATASET_FOLDER_FINETUNE = "dataset-finetune"
-TRAIN_FOLDER = f"{DATASET_FOLDER_FINETUNE}/train"
+TRAIN_FOLDER = f"{DATASET_FOLDER_FINETUNE}/training"
 VALIDATION_FOLDER = f"{DATASET_FOLDER_FINETUNE}/validation"
 
 # Folders to create
-# FOLDERS_TO_CREATE = [TRAIN_FOLDER, VALIDATION_FOLDER]
+FOLDERS_TO_CREATE = [DATASET_FOLDER_FINETUNE]
 
 
 # Function to split and copy files
@@ -38,8 +39,8 @@ def split_to_train_validation(source_folder, dest_train_folder, dest_validation_
 
 def main():
 	
-	# utils_anynet.delete_folders(FOLDERS_TO_CREATE)
-	# utils_anynet.create_folders(FOLDERS_TO_CREATE)
+	utils_anynet.delete_folders(FOLDERS_TO_CREATE)
+	utils_anynet.create_folders(FOLDERS_TO_CREATE)
 
 	left_images_count = len(os.listdir(LEFT_IMAGES_FOLDER))
 	right_images_count = len(os.listdir(RIGHT_IMAGES_FOLDER))
@@ -58,4 +59,5 @@ def main():
 
 
 if __name__ == "__main__":
+	coloredlogs.install(level="WARN", force=True)  # install a handler on the root logger
 	main()
