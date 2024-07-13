@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+'''script to prepare the original sceneflow dataset for finetune.py'''
+
 import os
 import shutil
 from glob import glob
@@ -36,8 +38,7 @@ VALIDATION_DISPARITY_FOLDER = f"{VALIDATION_FOLDER}/disp_occ_0/"
 # Folders to create
 FOLDERS_TO_CREATE = [DATASET_FOLDER_FINETUNE]
 
-
-# Function to split and copy files
+# split dset into test / validation folders
 def split_to_train_validation(source_folder, dest_train_folder, dest_validation_folder, split_index):
 	files = sorted(glob(f"{source_folder}/*"))
 	train_files = files[:split_index]
@@ -52,7 +53,7 @@ def split_to_train_validation(source_folder, dest_train_folder, dest_validation_
 	for file in tqdm(validation_files, desc="Copying validation files"):
 		shutil.copy(file, dest_validation_folder)
 
-
+# generating png-disparity from pfm-disparity 
 def process_disp_folder(source_folder, dest_folder = None):
 	files = sorted(glob(f"{source_folder}/*"))
 	logging.warning(f"NUmber of files in {os.path.dirname(source_folder)}: {len(files)}")
@@ -73,7 +74,7 @@ def process_disp_folder(source_folder, dest_folder = None):
 		filename = os.path.basename(file)
 		cv2.imwrite(f"{dest_folder}/{filename.replace('.pfm', '.png')}", data_uint8)
 	
-
+# preparing png-disparity files for finetune.py
 def process_dset(source_folder, target_file=None):
 	
 	if target_file is None:
@@ -102,25 +103,20 @@ def main():
 	total_files = left_images_count  
 	split_index = int(total_files * 0.75)  # 75% of 800
 
-	# Split and copy files for each folder
-	# split_to_train_validation(LEFT_IMAGES_FOLDER, f"{TRAIN_FOLDER}/image_2/", f"{VALIDATION_FOLDER}/image_2/", split_index)
-	# split_to_train_validation(RIGHT_IMAGES_FOLDER, f"{TRAIN_FOLDER}/image_3/", f"{VALIDATION_FOLDER}/image_3/", split_index)
-	# split_to_train_validation(LEFT_DISPARITY_FOLDER, f"{TRAIN_FOLDER}/disp_occ_0/", f"{VALIDATION_FOLDER}/disp_occ_0/", split_index)
-
+	# split dset [left, right, disp] into train / validation folders
 	split_to_train_validation(LEFT_IMAGES_FOLDER, TRAIN_LEFT_FOLDER, VALIDATION_LEFT_FOLDER, split_index)
 	split_to_train_validation(RIGHT_IMAGES_FOLDER, TRAIN_RIGHT_FOLDER, VALIDATION_RIGHT_FOLDER, split_index)
 	split_to_train_validation(LEFT_DISPARITY_FOLDER, TRAIN_DISPARITY_FOLDER,VALIDATION_DISPARITY_FOLDER, split_index)
 
-	# modify .pfm files to .png files
+	# generating .png disparity from .pfm files
 	process_disp_folder(VALIDATION_DISPARITY_FOLDER)
 	process_disp_folder(TRAIN_DISPARITY_FOLDER)
 
-
+	# prepatre png-disparity files for finetune.py
 	process_dset(VALIDATION_FOLDER)
 	process_dset(TRAIN_FOLDER)
 
-	# process_disp_folder(TRAIN_FOLDER/)
-
+	
 if __name__ == "__main__":
 	coloredlogs.install(level="WARNING", force=True)  # install a handler on the root logger
 	main()
