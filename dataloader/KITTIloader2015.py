@@ -16,6 +16,9 @@ def is_image_file(filename):
 
 
 def dataloader(filepath, log, split_file):
+
+    logging.warning(f"KITTI2015 dataloader called!")
+    
     left_fold = 'image_2/'
     right_fold = 'image_3/'
     disp_L = 'disp_occ_0/'

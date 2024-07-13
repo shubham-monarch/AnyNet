@@ -1,6 +1,9 @@
 import os
 import os.path
 
+import logging, coloredlogs 
+coloredlogs.install(level="DEBUG", force=True)  # install a handler on the root logger
+
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
     '.png', '.PNG'
@@ -11,6 +14,8 @@ def is_image_file(filename):
 
 
 def dataloader(filepath, log, split_file):
+    logging.warning(f"DIY dataloader called!")
+    
     left_fold = 'image_2/'
     right_fold = 'image_3/'
     disp_L = 'disp_occ_0/'
