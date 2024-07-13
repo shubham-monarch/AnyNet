@@ -5,6 +5,10 @@ import os
 import os.path
 import numpy as np
 import random
+import logging, coloredlogs
+
+coloredlogs.install(level="DEBUG", force=True)  # install a handler on the root logger
+
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -17,6 +21,7 @@ def is_image_file(filename):
 
 
 def dataloader(filepath, log, split_file):
+    logging.warning(f"KITTI2012 dataloader called!")
     left_fold = 'colored_0/'
     right_fold = 'colored_1/'
     disp_noc = 'disp_occ/'

@@ -3,8 +3,11 @@
 import os
 import shutil
 from glob import glob
-import utils_anynet
 import logging, coloredlogs
+
+
+from . import utils_anynet
+from dataloader import readpfm
 
 # Define source folders
 DATASET_FOLDER = "dataset-anynet"
@@ -37,6 +40,22 @@ def split_to_train_validation(source_folder, dest_train_folder, dest_validation_
 		shutil.copy(file, dest_validation_folder)
 
 
+def process_disp_folder(source_folder, dest_folder = None):
+	files = sorted(glob(f"{source_folder}/*"))
+	
+	if dest_folder is None:
+		dest_folder = f"{source_folder}-png"
+		os.makedirs(dest_folder, exist_ok=True)
+
+	for file in files:
+		# Read the PFM file
+		with open(file, "rb") as f:
+			image, scale = utils_anynet.load_pfm(f)
+
+		# Save the PFM file
+		with open(f"{dest_folder}/{os.path.basename(file)}", "wb") as f:
+			utils_anynet.save_pfm(f, image, scale)
+
 def main():
 	
 	utils_anynet.delete_folders(FOLDERS_TO_CREATE)
@@ -59,5 +78,5 @@ def main():
 
 
 if __name__ == "__main__":
-	coloredlogs.install(level="WARN", force=True)  # install a handler on the root logger
+	coloredlogs.install(level="DEBUG", force=True)  # install a handler on the root logger
 	main()
