@@ -59,11 +59,11 @@ def process_disp_folder(source_folder, dest_folder = None):
 	
 	if dest_folder is None:
 		dest_folder = f"{os.path.dirname(source_folder)}-png"
-		# logging.warn(f"dest_folder: {dest_folder} type(dest_folder): {type(dest_folder)}")
-		# os.makedirs(dest_folder, exist_ok=True)
 		utils_anynet.create_folders([dest_folder])
-
-	for idx, file in tqdm(enumerate(files)):
+	
+	logging.warning(f"Converting .pfm files to .png files in {[dest_folder]}")
+	
+	for file in tqdm(files):
 		data, _ = readpfm.readPFM(file)
 		data *= 256
 
@@ -72,8 +72,20 @@ def process_disp_folder(source_folder, dest_folder = None):
 
 		filename = os.path.basename(file)
 		cv2.imwrite(f"{dest_folder}/{filename.replace('.pfm', '.png')}", data_uint8)
-		# logging.warning(f"data.dtype: {data.dtype}  data.shape: {data.shape}")
-		break
+	
+
+def process_dset(source_folder, target_file=None):
+	
+	if target_file is None:
+		# renaming the disparity folders to load png disparities
+		disp_pfm_old = os.path.join(source_folder, "disp_occ_0/")
+		disp_pfm_new = os.path.join(source_folder, "disp_occ_0-pfm/")
+		utils_anynet.create_folders([disp_pfm_new])
+		disp_png = os.path.join(source_folder, "disp_occ_0-png/")
+		
+		os.rename(disp_pfm_old, disp_pfm_new)
+		os.rename(disp_png, disp_pfm_old)
+		# os.rename(temp_path_pfm, disp_png)
 
 def main():
 	
@@ -103,6 +115,9 @@ def main():
 	process_disp_folder(VALIDATION_DISPARITY_FOLDER)
 	process_disp_folder(TRAIN_DISPARITY_FOLDER)
 
+
+	process_dset(VALIDATION_FOLDER)
+	process_dset(TRAIN_FOLDER)
 
 	# process_disp_folder(TRAIN_FOLDER/)
 

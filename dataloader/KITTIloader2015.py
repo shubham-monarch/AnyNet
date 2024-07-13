@@ -4,6 +4,7 @@ from PIL import Image
 import os
 import os.path
 import numpy as np
+import logging
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',

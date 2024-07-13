@@ -167,5 +167,5 @@ def delete_folders(folders):
 def create_folders(folders):
 	for path in folders:
 		os.makedirs(path, exist_ok=True)
-		logging.warning(f"Created the {path} folder!")
+		logging.warning(f"Created the {[path]} folder!")
 
