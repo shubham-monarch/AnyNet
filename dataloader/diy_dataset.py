@@ -2,7 +2,7 @@ import os
 import os.path
 
 import logging, coloredlogs 
-coloredlogs.install(level="DEBUG", force=True)  # install a handler on the root logger
+coloredlogs.install(level="WARN", force=True)  # install a handler on the root logger
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
