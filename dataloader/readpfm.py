@@ -3,6 +3,11 @@ import numpy as np
 import sys
 
 
+'''
+Read a PFM file into a Numpy array. Note that it will have
+a shape of H x W, not W x H. Returns a tuple containing the
+loaded image and the scale factor from the file.
+'''
 def readPFM(file):
     file = open(file, 'rb')
 
@@ -35,6 +40,7 @@ def readPFM(file):
 
     data = np.fromfile(file, endian + 'f')
     shape = (height, width, 3) if color else (height, width)
+    # shape = (width, height, 3) if color else (width, height)
 
     data = np.reshape(data, shape)
     data = np.flipud(data)

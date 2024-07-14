@@ -53,6 +53,8 @@ class myImageFloder(data.Dataset):
         right_img = self.loader(right)
         dataL = self.dploader(disp_L)
 
+        # logging.error(f"left_img.shape: {np.array(left_img).shape}")
+        # logging.error(f"dataL.shape: {np.array(dataL).shape}")
 
 
         if self.training:  

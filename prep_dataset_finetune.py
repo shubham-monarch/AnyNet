@@ -56,7 +56,7 @@ def split_to_train_validation(source_folder, dest_train_folder, dest_validation_
 # generating png-disparity from pfm-disparity 
 def process_disp_folder(source_folder, dest_folder = None):
 	files = sorted(glob(f"{source_folder}/*"))
-	logging.warning(f"NUmber of files in {os.path.dirname(source_folder)}: {len(files)}")
+	logging.warning(f"Number of files in {os.path.dirname(source_folder)}: {len(files)}")
 	
 	if dest_folder is None:
 		dest_folder = f"{os.path.dirname(source_folder)}-png"

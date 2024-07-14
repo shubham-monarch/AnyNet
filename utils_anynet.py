@@ -162,10 +162,10 @@ def delete_folders(folders):
 					# time.sleep(1)  # wait for 1 second before retrying
 			else:
 				print(f"The folder {folder_path} does not exist.")	
-	logging.warning(f"Deleted the old files in {folders}!")
+	logging.debug(f"Deleted the old files in {folders}!")
 		
 def create_folders(folders):
 	for path in folders:
 		os.makedirs(path, exist_ok=True)
-		logging.warning(f"Created the {[path]} folder!")
+		logging.debug(f"Created the {[path]} folder!")
 

@@ -137,8 +137,10 @@ class AnyNet(nn.Module):
         pred = []
         for scale in range(len(feats_l)):
             if scale > 0:
-                wflow = F.upsample(pred[scale-1], (feats_l[scale].size(2), feats_l[scale].size(3)),
-                                   mode='bilinear') * feats_l[scale].size(2) / img_size[2]
+                # wflow = F.upsample(pred[scale-1], (feats_l[scale].size(2), feats_l[scale].size(3)),
+                #                    mode='bilinear') * feats_l[scale].size(2) / img_size[2]
+                wflow = F.interpolate(pred[scale-1], size=(feats_l[scale].size(2), feats_l[scale].size(3)),
+                      mode='bilinear', align_corners=False) * feats_l[scale].size(2) / img_size[2]
                 cost = self._build_volume_2d3(feats_l[scale], feats_r[scale],
                                          self.maxdisplist[scale], wflow, stride=1)
             else:
@@ -151,27 +153,32 @@ class AnyNet(nn.Module):
             if scale == 0:
                 pred_low_res = disparityregression2(0, self.maxdisplist[0])(F.softmax(-cost, dim=1))
                 pred_low_res = pred_low_res * img_size[2] / pred_low_res.size(2)
-                disp_up = F.upsample(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
+                # disp_up = F.upsample(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
+                disp_up = F.interpolate(pred_low_res, size=(img_size[2], img_size[3]), mode='bilinear', align_corners=False)
                 pred.append(disp_up)
             else:
                 pred_low_res = disparityregression2(-self.maxdisplist[scale]+1, self.maxdisplist[scale], stride=1)(F.softmax(-cost, dim=1))
                 pred_low_res = pred_low_res * img_size[2] / pred_low_res.size(2)
-                disp_up = F.upsample(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
+                # disp_up = F.upsample(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
+                disp_up = F.interpolate(pred_low_res, size=(img_size[2], img_size[3]), mode='bilinear', align_corners=False)
                 pred.append(disp_up+pred[scale-1])
 
 
         if self.refine_spn:
-            spn_out = self.refine_spn[0](nn.functional.upsample(left, (img_size[2]//4, img_size[3]//4), mode='bilinear'))
+            # spn_out = self.refine_spn[0](nn.functional.upsample(left, (img_size[2]//4, img_size[3]//4), mode='bilinear'))
+            spn_out = self.refine_spn[0](nn.functional.interpolate(left, size=(img_size[2]//4, img_size[3]//4), mode='bilinear', align_corners=False))
             G1, G2, G3 = spn_out[:,:self.spn_init_channels,:,:], spn_out[:,self.spn_init_channels:self.spn_init_channels*2,:,:], spn_out[:,self.spn_init_channels*2:,:,:]
             sum_abs = G1.abs() + G2.abs() + G3.abs()
             G1 = torch.div(G1, sum_abs + 1e-8)
             G2 = torch.div(G2, sum_abs + 1e-8)
             G3 = torch.div(G3, sum_abs + 1e-8)
-            pred_flow = nn.functional.upsample(pred[-1], (img_size[2]//4, img_size[3]//4), mode='bilinear')
+            # pred_flow = nn.functional.upsample(pred[-1], (img_size[2]//4, img_size[3]//4), mode='bilinear')
+            pred_flow = nn.functional.interpolate(pred[-1], size=(img_size[2]//4, img_size[3]//4), mode='bilinear', align_corners=False)
             refine_flow = self.spn_layer(self.refine_spn[1](pred_flow), G1, G2, G3)
             refine_flow = self.refine_spn[2](refine_flow)
-            pred.append(nn.functional.upsample(refine_flow, (img_size[2] , img_size[3]), mode='bilinear'))
-
+            # pred.append(nn.functional.upsample(refine_flow, (img_size[2] , img_size[3]), mode='bilinear'))
+            pred.append(nn.functional.interpolate(refine_flow, size=(img_size[2], img_size[3]), mode='bilinear', align_corners=False))
+        
         # logging.info(f"[AnyNet.py] -> pred.shape: {pred.shape}")
         logging.info(f"[AnyNey.py] -> len(pred): {len(pred)}")
         for pred_ in pred: 

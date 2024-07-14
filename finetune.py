@@ -13,8 +13,8 @@ import torch.backends.cudnn as cudnn
 
 import models.anynet
 from torchvision.utils import save_image
-
-
+import numpy as np
+import cv2
 
 # custom imports
 import logging, coloredlogs
@@ -70,38 +70,40 @@ elif args.datatype == 'other':
 INFERENCE_NO_SPN_FOLDER = "pt_inference_no_spn"
 GT_DISP_FOLDER = prep_dataset_finetune.VALIDATION_DISPARITY_FOLDER
 
+# TO-DO => 
+# - interpolate vs upsample
+# - fix torchvision
+# - fix spn package
 
 # def save_batch_images(output: torch.Tensor, stage: int, output_folder: str):s
 def save_batch_images(outputs, stage: int, output_folder: str):
-    """
-    Saves each image in the output batch to the specified directory as a PNG file.
-    
-    Parameters:
-    - output: Tensor of shape [batch_size, height, width], the model's output.
-    - directory: String, the directory where images will be saved.
-    """
-
-    # # Ensure the output directory exists
-    # os.makedirs(directory, exist_ok=True)
     
     utils_anynet.delete_folders([output_folder])
     utils_anynet.create_folders([output_folder])
 
-    # logging.warning(f"output.shape: {output.shape}")
-    logging.warning(f"output.shape: {outputs.shape}")
-    # Add a channel dimension to output: [B, H, W] -> [B, C, H, W]
-    # output_with_channel = output.unsqueeze(1)  # Adds a channel dimension
-    # logging.warning(f"output_with_channel.shape: {output_with_channel.shape}")
-
-    # Iterate through each image in the batch
-    # for i, image in enumerate(output_with_channel):
-    #     # Save each image as a PNG file
-    #     save_image(image, os.path.join(output_folder, f"image_{i}.png"))
-
-    for i, image in enumerate(outputs):
+    logging.warning(f"outputs.shape: {outputs.shape}")
+    
+    for i, output in enumerate(outputs):
         # Save each image as a PNG file
-        save_image(image, os.path.join(output_folder, f"image_{i}.png"))
+        output = output.squeeze(0)
+        output = output * 255.0
+        logging.info(f"output.shape: {output.shape}")
+        mn = torch.min(output)
+        mx = torch.max(output)
+        # logging.info(f"mn: {mn} mx: {mx}")
 
+        output_normalized = (output - mn) / (mx - mn)
+        output_normalized = output_normalized * 255.0   
+        # output_normalized = output_normalized.to(torch.uint8)
+
+        output_np = output_normalized.cpu().detach().numpy()
+
+        # Convert the data type to uint8
+        output_np_uint8 = np.clip(output_np, 0, 255).astype('uint8')
+
+        # Use OpenCV to write the image to a file
+        cv2.imwrite(f"{output_folder}/image_{i}.png", output_np_uint8)
+        # save_image(output_normalized, os.path.join(output_folder, f"image_{i}.png"))
 
 
 def inference():
@@ -113,12 +115,6 @@ def inference():
 
     logging.warning(f"len(test_left_img): {len(test_left_img)}")
 
-    # return
-
-    # TrainImgLoader = torch.utils.data.DataLoader(
-    #     DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
-    #     batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
-
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
@@ -127,13 +123,13 @@ def inference():
 
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
-    for key, value in sorted(vars(args).items()):
-        log.info(str(key) + ': ' + str(value))
+    # for key, value in sorted(vars(args).items()):
+    #     log.info(str(key) + ': ' + str(value))
 
     model = models.anynet.AnyNet(args)
     model = nn.DataParallel(model).cuda()
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
-    log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
+    # log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
     if args.pretrained:
         logging.error(f"args.pretrained: {args.pretrained}")
@@ -181,6 +177,8 @@ def inference():
                 # output = torch.squeeze(outputs[x], 1)
                 # D1s[x].update(error_estimating(output, disp_L).item())
                 # save_batch_images(output, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
+                # outputs_cpu = outputs[x].cpu()
+                # save_batch_images(outputs_cpu, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 save_batch_images(outputs[x], stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 logging.warning(f"[Stage {x}] output.dtype: {output.dtype} output.shape: {output.shape}")
 
