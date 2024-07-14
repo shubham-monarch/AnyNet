@@ -13,6 +13,10 @@ import torch.backends.cudnn as cudnn
 
 import models.anynet
 
+
+# custom imports
+import logging, coloredlogs
+
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maxium disparity')
@@ -58,17 +62,16 @@ elif args.datatype == '2012':
 elif args.datatype == 'other':
     from dataloader import diy_dataset as ls
 
-
-def main():
+def inference():
     global args
     log = logger.setup_logger(args.save_path + '/training.log')
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
         args.datapath,log, args.split_file)
 
-    TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
-        batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+    # TrainImgLoader = torch.utils.data.DataLoader(
+    #     DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+    #     batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
@@ -85,52 +88,175 @@ def main():
     log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
     if args.pretrained:
+        logging.error(f"args.pretrained: {args.pretrained}")
         if os.path.isfile(args.pretrained):
             checkpoint = torch.load(args.pretrained)
             model.load_state_dict(checkpoint['state_dict'], strict=False)
-            log.info("=> loaded pretrained model '{}'"
+            log.info("=> loaded pretrained model'{}'"
                      .format(args.pretrained))
         else:
             log.info("=> no pretrained model found at '{}'".format(args.pretrained))
             log.info("=> Will start from scratch.")
-    args.start_epoch = 0
-    if args.resume:
-        if os.path.isfile(args.resume):
-            log.info("=> loading checkpoint '{}'".format(args.resume))
-            checkpoint = torch.load(args.resume)
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            log.info("=> loaded checkpoint '{}' (epoch {})"
-                     .format(args.resume, checkpoint['epoch']))
-        else:
-            log.info("=> no checkpoint found at '{}'".format(args.resume))
-            log.info("=> Will start from scratch.")
-    else:
-        log.info('Not Resume')
+    
     cudnn.benchmark = True
-    start_full_time = time.time()
-    if args.evaluate:
-        test(TestImgLoader, model, log)
-        return
+    model.eval()
 
-    for epoch in range(args.start_epoch, args.epochs):
-        log.info('This is {}-th epoch'.format(epoch))
-        adjust_learning_rate(optimizer, epoch)
+    stages = 3 + args.with_spn
+    # D1s = [AverageMeter() for _ in range(stages)]
+    # length_loader = len(dataloader)
 
-        train(TrainImgLoader, model, optimizer, log, epoch)
+    # model.eval()
 
-        savefilename = args.save_path + '/checkpoint.tar'
-        torch.save({
-            'epoch': epoch,
-            'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }, savefilename)
+    for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
+        
+        logging.error(f"=====================================================")
+        if batch_idx > 2: 
+            logging.warning(f"Breaking after 3 batches")
+            break
 
-        if epoch % 1 ==0:
-            test(TestImgLoader, model, log)
+        imgL = imgL.float().cuda()
+        imgR = imgR.float().cuda()
+        disp_L = disp_L.float().cuda()
+        
+        with torch.no_grad():
+            outputs = model(imgL, imgR)
+            # logging.error("*****************************")
+            logging.info(f"type(outputs): {type(outputs)} len(outputs): {len(outputs)}")
+            # logging.error("*****************************")
+            logging.info(f"[before squeezing]")
+            
+            for stage, output in enumerate(outputs):
+                logging.warning(f"[Stage {stage}] type(output): {type(output)} output.shape: {output.shape}")
+            
+            logging.info("[after squeezing]")
+            for x in range(stages):
+                output = torch.squeeze(outputs[x], 1)
+                # D1s[x].update(error_estimating(output, disp_L).item())
+                logging.warning(f"[Stage {x}] output.dtype: {output.dtype} output.shape: {output.shape}")
+                # logging.info(f"{batch_idx} output.dtype: {output.dtype} output.shape: {output.shape}")
+        logging.error(f"=====================================================\n")
+        
+    #     info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
 
-    test(TestImgLoader, model, log)
-    log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
+    #     log.info('[{}/{}] {}'.format(
+    #         batch_idx, length_loader, info_str))
+
+    # info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
+    # log.info('Average test 3-Pixel Error = ' + info_str)
+
+
+    # args.start_epoch = 0
+    # if args.resume:
+    #     if os.path.isfile(args.resume):
+    #         log.info("=> loading checkpoint '{}'".format(args.resume))
+    #         checkpoint = torch.load(args.resume)
+    #         model.load_state_dict(checkpoint['state_dict'])
+    #         optimizer.load_state_dict(checkpoint['optimizer'])
+    #         log.info("=> loaded checkpoint '{}' (epoch {})"
+    #                  .format(args.resume, checkpoint['epoch']))
+    #     else:
+    #         log.info("=> no checkpoint found at '{}'".format(args.resume))
+    #         log.info("=> Will start from scratch.")
+    # else:
+    #     log.info('Not Resume')
+    # cudnn.benchmark = True
+    # start_full_time = time.time()
+    # if args.evaluate:
+    #     test(TestImgLoader, model, log)
+    #     return
+
+    # for epoch in range(args.start_epoch, args.epochs):
+    #     log.info('This is {}-th epoch'.format(epoch))
+    #     adjust_learning_rate(optimizer, epoch)
+
+    #     train(TrainImgLoader, model, optimizer, log, epoch)
+
+    #     savefilename = args.save_path + '/checkpoint.tar'
+    #     torch.save({
+    #         'epoch': epoch,
+    #         'state_dict': model.state_dict(),
+    #         'optimizer': optimizer.state_dict(),
+    #     }, savefilename)
+
+    #     if epoch % 1 ==0:
+    #         test(TestImgLoader, model, log)
+
+    # test(TestImgLoader, model, log)
+    # log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
+
+
+# def main():
+#     global args
+#     log = logger.setup_logger(args.save_path + '/training.log')
+
+#     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
+#         args.datapath,log, args.split_file)
+
+#     TrainImgLoader = torch.utils.data.DataLoader(
+#         DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+#         batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+
+#     TestImgLoader = torch.utils.data.DataLoader(
+#         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
+#         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+
+#     if not os.path.isdir(args.save_path):
+#         os.makedirs(args.save_path)
+#     for key, value in sorted(vars(args).items()):
+#         log.info(str(key) + ': ' + str(value))
+
+#     model = models.anynet.AnyNet(args)
+#     model = nn.DataParallel(model).cuda()
+#     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+#     log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
+
+#     if args.pretrained:
+#         if os.path.isfile(args.pretrained):
+#             checkpoint = torch.load(args.pretrained)
+#             model.load_state_dict(checkpoint['state_dict'], strict=False)
+#             log.info("=> loaded pretrained model'{}'"
+#                      .format(args.pretrained))
+#         else:
+#             log.info("=> no pretrained model found at '{}'".format(args.pretrained))
+#             log.info("=> Will start from scratch.")
+#     args.start_epoch = 0
+#     if args.resume:
+#         if os.path.isfile(args.resume):
+#             log.info("=> loading checkpoint '{}'".format(args.resume))
+#             checkpoint = torch.load(args.resume)
+#             model.load_state_dict(checkpoint['state_dict'])
+#             optimizer.load_state_dict(checkpoint['optimizer'])
+#             log.info("=> loaded checkpoint '{}' (epoch {})"
+#                      .format(args.resume, checkpoint['epoch']))
+#         else:
+#             log.info("=> no checkpoint found at '{}'".format(args.resume))
+#             log.info("=> Will start from scratch.")
+#     else:
+#         log.info('Not Resume')
+#     cudnn.benchmark = True
+#     start_full_time = time.time()
+#     if args.evaluate:
+#         test(TestImgLoader, model, log)
+#         return
+
+#     for epoch in range(args.start_epoch, args.epochs):
+#         log.info('This is {}-th epoch'.format(epoch))
+#         adjust_learning_rate(optimizer, epoch)
+
+#         train(TrainImgLoader, model, optimizer, log, epoch)
+
+#         savefilename = args.save_path + '/checkpoint.tar'
+#         torch.save({
+#             'epoch': epoch,
+#             'state_dict': model.state_dict(),
+#             'optimizer': optimizer.state_dict(),
+#         }, savefilename)
+
+#         if epoch % 1 ==0:
+#             test(TestImgLoader, model, log)
+
+#     test(TestImgLoader, model, log)
+#     log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
 
 
 def train(dataloader, model, optimizer, log, epoch=0):
@@ -176,6 +302,35 @@ def train(dataloader, model, optimizer, log, epoch=0):
                 epoch, batch_idx, length_loader, info_str))
     info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
     log.info('Average train loss = ' + info_str)
+
+
+
+def inference_test(dataloader, model, log):
+
+    stages = 3 + args.with_spn
+    D1s = [AverageMeter() for _ in range(stages)]
+    length_loader = len(dataloader)
+
+    model.eval()
+
+    for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
+        imgL = imgL.float().cuda()
+        imgR = imgR.float().cuda()
+        disp_L = disp_L.float().cuda()
+
+        with torch.no_grad():
+            outputs = model(imgL, imgR)
+            for x in range(stages):
+                output = torch.squeeze(outputs[x], 1)
+                D1s[x].update(error_estimating(output, disp_L).item())
+
+        info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
+
+        log.info('[{}/{}] {}'.format(
+            batch_idx, length_loader, info_str))
+
+    info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
+    log.info('Average test 3-Pixel Error = ' + info_str)
 
 
 def test(dataloader, model, log):
@@ -244,4 +399,6 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 if __name__ == '__main__':
-    main()
+    # main()
+    coloredlogs.install(level="INFO", force=True)  # install a handler on the root logger
+    inference()
