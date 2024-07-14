@@ -1,9 +1,16 @@
-dataset-anynet/*
 *.zip 
 checkpoint/* 
+
+
+# pycache folders
 **/__pycache__/ 
 results/*
 __pycache__/*
 __pycache__/*
+
+# data folders
+dataset-anynet/*
 dataset-finetune/*
 dset-finetune/*
+pt_inference_no_spn/*
+

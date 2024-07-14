@@ -12,10 +12,14 @@ import utils.logger as logger
 import torch.backends.cudnn as cudnn
 
 import models.anynet
+from torchvision.utils import save_image
+
 
 
 # custom imports
 import logging, coloredlogs
+import prep_dataset_finetune
+import utils_anynet
 
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
 parser.add_argument('--maxdisp', type=int, default=192,
@@ -62,12 +66,54 @@ elif args.datatype == '2012':
 elif args.datatype == 'other':
     from dataloader import diy_dataset as ls
 
+
+INFERENCE_NO_SPN_FOLDER = "pt_inference_no_spn"
+GT_DISP_FOLDER = prep_dataset_finetune.VALIDATION_DISPARITY_FOLDER
+
+
+# def save_batch_images(output: torch.Tensor, stage: int, output_folder: str):s
+def save_batch_images(outputs, stage: int, output_folder: str):
+    """
+    Saves each image in the output batch to the specified directory as a PNG file.
+    
+    Parameters:
+    - output: Tensor of shape [batch_size, height, width], the model's output.
+    - directory: String, the directory where images will be saved.
+    """
+
+    # # Ensure the output directory exists
+    # os.makedirs(directory, exist_ok=True)
+    
+    utils_anynet.delete_folders([output_folder])
+    utils_anynet.create_folders([output_folder])
+
+    # logging.warning(f"output.shape: {output.shape}")
+    logging.warning(f"output.shape: {outputs.shape}")
+    # Add a channel dimension to output: [B, H, W] -> [B, C, H, W]
+    # output_with_channel = output.unsqueeze(1)  # Adds a channel dimension
+    # logging.warning(f"output_with_channel.shape: {output_with_channel.shape}")
+
+    # Iterate through each image in the batch
+    # for i, image in enumerate(output_with_channel):
+    #     # Save each image as a PNG file
+    #     save_image(image, os.path.join(output_folder, f"image_{i}.png"))
+
+    for i, image in enumerate(outputs):
+        # Save each image as a PNG file
+        save_image(image, os.path.join(output_folder, f"image_{i}.png"))
+
+
+
 def inference():
     global args
     log = logger.setup_logger(args.save_path + '/training.log')
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
         args.datapath,log, args.split_file)
+
+    logging.warning(f"len(test_left_img): {len(test_left_img)}")
+
+    # return
 
     # TrainImgLoader = torch.utils.data.DataLoader(
     #     DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
@@ -76,6 +122,8 @@ def inference():
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+
+    # return
 
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
@@ -102,7 +150,7 @@ def inference():
     model.eval()
 
     stages = 3 + args.with_spn
-    # D1s = [AverageMeter() for _ in range(stages)]
+    D1s = [AverageMeter() for _ in range(stages)]
     # length_loader = len(dataloader)
 
     # model.eval()
@@ -110,19 +158,19 @@ def inference():
     for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
         
         logging.error(f"=====================================================")
-        if batch_idx > 2: 
+        if batch_idx > 0: 
             logging.warning(f"Breaking after 3 batches")
             break
+        logging.error(f"batch_idx: {batch_idx}")
 
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
+        # logging.info(f"disp_L.shape: {disp_L.shape} disp_L.dtype: {disp_L.dtype}")
         
         with torch.no_grad():
             outputs = model(imgL, imgR)
-            # logging.error("*****************************")
             logging.info(f"type(outputs): {type(outputs)} len(outputs): {len(outputs)}")
-            # logging.error("*****************************")
             logging.info(f"[before squeezing]")
             
             for stage, output in enumerate(outputs):
@@ -130,14 +178,21 @@ def inference():
             
             logging.info("[after squeezing]")
             for x in range(stages):
-                output = torch.squeeze(outputs[x], 1)
+                # output = torch.squeeze(outputs[x], 1)
                 # D1s[x].update(error_estimating(output, disp_L).item())
+                # save_batch_images(output, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
+                save_batch_images(outputs[x], stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 logging.warning(f"[Stage {x}] output.dtype: {output.dtype} output.shape: {output.shape}")
-                # logging.info(f"{batch_idx} output.dtype: {output.dtype} output.shape: {output.shape}")
+
+        
+        
+        
+        # info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
+        # logging.info(f'Average test 3-Pixel Error = {info_str}')
+
+        # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
         logging.error(f"=====================================================\n")
         
-    #     info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
-
     #     log.info('[{}/{}] {}'.format(
     #         batch_idx, length_loader, info_str))
 
@@ -362,6 +417,7 @@ def test(dataloader, model, log):
 
 
 def error_estimating(disp, ground_truth, maxdisp=192):
+    # logging.info("[error_estimating] -> entering")
     gt = ground_truth
     mask = gt > 0
     mask = mask * (gt < maxdisp)
