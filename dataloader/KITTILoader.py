@@ -93,8 +93,8 @@ class myImageFloder(data.Dataset):
            right_img      = processed(right_img)
         #    logging.warning(f"[after] left_img.shape: {np.array(left_img).shape}")
            
-
-           return left_img, right_img, dataL
+           return left, right, disp_L, left_img, right_img, dataL
+        #    return left_img, right_img, dataL
 
     def __len__(self):
         return len(self.left)

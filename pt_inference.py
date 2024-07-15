@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import logging, coloredlogs
 import prep_dataset_finetune
 import utils_anynet
+from PIL import Image
 
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
 parser.add_argument('--maxdisp', type=int, default=192,
@@ -68,12 +69,16 @@ elif args.datatype == '2012':
 elif args.datatype == 'other':
     from dataloader import diy_dataset as ls
 
+# gt disparity folder
 GT_DISP_FOLDER = prep_dataset_finetune.VALIDATION_DISPARITY_FOLDER
+
+# pt inference folder(s)
 PT_INFERENCE_NO_SPN_DIR = "pt_inference_no_spn"
-HISTOGRAMS_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/histograms" 
+INPUT_IMAGES_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/input"
+DISPARITY_IMAGES_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/disp"
 
 # TO-DO => 
-# - interpolate vs upsample [undo this / research this]
+# [x]- interpolate vs upsample [undo this / research this] ==> UPSAMPING IS WRONG
 # - fix torchvision
 # - fix spn package
 # - negative disparity
@@ -83,47 +88,27 @@ HISTOGRAMS_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/histograms"
     # - accuracy not improving across stage
     # - check if pre-trained model is loaded
     # - check if there is a pytorch version issue while loading the pre-trained model 
+    # - fix the s1, s2, s3 disparity maps
+    # - is testloader loading images sequentially
+    # - reduce 3 pixel error
 
-
-def tensorf32_to_histogram(output: torch.Tensor, output_dir: str, stage: int = None):
-    utils_anynet.delete_folders([output_dir])
-    utils_anynet.create_folders([output_dir])
-    
-    logging.info(f"[tensorf32_to_histogram] stage: {stage}")
-    output_np = output.cpu().numpy()
-    logging.info(f"[tensorf32_to_histogram] output_np.shape: {output_np.shape} output.shape: {output.shape}")
-    for i in range(output.shape[0]):
-        plt.figure()
-        # Flatten the image to get the distribution of all pixel values
-        img = output_np[i]
-        logging.info(f"[tensorf32_to_histogram] img.shape: {img.shape}")
-        img_flat = img.flatten()
-        logging.info(f"mx: {np.max(img_flat)} mn: {np.min(img_flat)}")
-        plt.hist(img_flat, bins=50, color='blue', alpha=0.7)
-        plt.title(f"Histogram for Image {i}")
-        plt.xlabel("Pixel Value")
-        plt.ylabel("Frequency")
         
-        # Save the histogram
-        plt.savefig(f"{output_dir}/histogram_{i}_{stage}.png")
-        plt.close()
-    
-
-def tensorf32_to_png(output, stage: int, output_folder: str):
-    
-    utils_anynet.delete_folders([output_folder])
-    utils_anynet.create_folders([output_folder])
-    return
-
 def inference():
+
+    FOLDERS_TO_CREATE = [PT_INFERENCE_NO_SPN_DIR, INPUT_IMAGES_NO_SPN_DIR, DISPARITY_IMAGES_NO_SPN_DIR]
+    utils_anynet.delete_folders(FOLDERS_TO_CREATE)
+    utils_anynet.create_folders(FOLDERS_TO_CREATE)
+
     global args
     log = logger.setup_logger(args.save_path + '/training.log')
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
         args.datapath,log, args.split_file)
 
-    logging.warning(f"len(test_left_img): {len(test_left_img)}")
+    # logging.warning(f"len(test_left_img): {len(test_left_img)}")
+    # logging.warning(f"type(test_left_img): {type(test_left_img)} type(test_left_img[0]): {type(test_left_img[0])}")
 
+    
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
@@ -158,14 +143,52 @@ def inference():
 
     # model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
-        
-        logging.error(f"=====================================================")
-        if batch_idx > 0: 
-            logging.warning(f"Breaking after 3 batches")
-            break
-        logging.error(f"batch_idx: {batch_idx}")
+    # utils_anynet.delete_folders([HISTOGRAMS_NO_SPN_DIR])
+    # utils_anynet.create_folders([HISTOGRAMS_NO_SPN_DIR])
+    
+    # cv2.namedWindow("TEST", cv2.WINDOW_NORMAL)
 
+    for batch_idx, (path_l , path_r, path_disp, imgL, imgR, disp_L) in enumerate(TestImgLoader):
+
+        batch_cutoff = 0        
+        if batch_idx > batch_cutoff:
+            break
+        logging.error(f"=====================[BATCH {batch_idx} STARTED]================================")
+        # logging.warning(f"[{batch_idx}]")
+        # logging.info(f"path_l: {path_l}")
+        # logging.info(f"path_r: {path_r}")
+        # logging.info(f"path_disp: {path_disp}\n")
+
+        logging.info(f"type(imgL): {type(imgL)} imgL.shape: {imgL.shape} imgL.dtype: {imgL.dtype}")
+        logging.info(f"type(imgL[0]): {type(imgL[0])} imgL[0].shape: {imgL[0].shape} imgL[0].dtype: {imgL[0].dtype}")
+        # logging.info(f"type(imgR): {type(imgR)} type(imgR[0]): {type(imgR[0])} imgR[0].shape: {imgR[0].shape} imgR[0].dtype: {imgR[0].dtype}")
+        logging.info(f"type(disp_L): {type(disp_L)}  disp_L.shape: {disp_L.shape} disp_L.dtype: {disp_L.dtype}")
+        logging.info(f"type(disp_L[0]): {type(disp_L[0])} disp_L[0].shape: {disp_L[0].shape} disp_L[0].dtype: {disp_L[0].dtype}")
+        # logging.info(f"type(disp_L): {type(disp_L)} type(disp_L[0]): {type(disp_L[0])} disp_L[0].shape: {disp_L[0].shape} disp_L[0].dtype: {disp_L[0].dtype}")
+        
+        # logging.info(f"type(imgR[0]): {type(imgR[0])} imgR[0].shape: {imgR[0].shape} imgR[0].dtype: {imgR[0].dtype}")
+        # logging.info(f"type(disp_L[0]): {type(disp_L[0])} disp_L[0].shape: {disp_L[0].shape} disp_L[0].dtype: {disp_L[0].dtype}")
+        # Convert to numpy and adjust dimensions
+        np_images = imgL.cpu().numpy()
+        np_images = np.transpose(np_images, (0, 2, 3, 1))  # Change from [N, C, H, W] to [N, H, W, C]
+
+        # Scale to 0-255 and convert to uint8
+        np_images = (np_images * 255).clip(0, 255).astype(np.uint8)
+
+        # Save each image
+        for i, img_array in enumerate(np_images):
+            img = Image.fromarray(img_array)
+            path_img = os.path.basename(path_l[i])
+            img.save(f"{INPUT_IMAGES_NO_SPN_DIR}/{path_img}")
+
+        # continue
+        # hconcat_LR = cv2.hconcat([imgL[0].numpy(), imgR[0].numpy()])
+        filename = os.path.basename(path_l[0])
+        for idx, path in enumerate(path_l):
+            filename = os.path.basename(path)
+            # cv2.imwrite(f"{INPUT_IMAGES_NO_SPN_DIR}/{filename}", imgL[0].numpy())
+        
+        # continue
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -179,23 +202,45 @@ def inference():
             for stage, output in enumerate(outputs):
                 logging.warning(f"[Stage {stage}] output.dtype: {output.dtype} output.shape: {output.shape}")
             
-            # logging.info("[after squeezing]")
+            logging.info("[after squeezing]")
             for x in range(stages):
-                # output = torch.squeeze(outpsuts[x], 1)
-                # D1s[x].update(error_estimating(output, disp_L).item())
+                if x < 2:
+                    continue
+                output = torch.squeeze(outputs[x], 1)
+                D1s[x].update(error_estimating(output, disp_L).item())
                 # save_batch_images(output, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 # outputs_cpu = outputs[x].cpu()
                 # save_batch_images(outputs_cpu, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
-                logging.warning(f"[Stage {x}] output.dtype: {output.dtype} output.shape: {output.shape}")
-                tensorf32_to_histogram(output, output_dir=HISTOGRAMS_NO_SPN_DIR, stage=x)
-        
-        
-        
-        # info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
-        # logging.info(f'Average test 3-Pixel Error = {info_str}')
+                logging.warning(f"[STAGE {x}]")
+                logging.info(f"output.dtype: {output.dtype} output.shape: {output.shape}")
+                # tensorf32_to_hisstogram(output, output_dir=HISTOGRAMS_NO_SPN_DIR, stage=x)
+                # tensorf32_to_png(output, output_dir=HISTOGRAMS_NO_SPN_DIR, stage=x)
+                
+                # [8, W, H]
+                output_cpu = output.cpu().numpy()
+                for image_idx, output_cpu_ in enumerate(output_cpu):
+                    # logging.info(f"[{image_idx}] --> output_np_.min(): {output_np_.min()} output_np_.max(): {output_np_.max()}")
+                    
+                    # [W,H]
+                    # img_cpu = np.asarray(output.cpu())
+                    # img_save = np.clip(output_cpu_, 0, 2**16)
+                    # img_save = (img_save * 256.0).astype(np.uint16)
+                    # img_name = f"{HISTOGRAMS_NO_SPN_DIR}/histogram_{batch_idx}_{image_idx}_{x}.png"
+                    # cv2.imwrite(img_name, img_save)
+                    
+                    output_int8 = utils_anynet.uint8_normalization(output_cpu_)
+                    path_disp = os.path.basename(path_l[image_idx])
+                    cv2.imwrite(f"{DISPARITY_IMAGES_NO_SPN_DIR}/{path_disp}", output_int8)
+                    # # pass
 
-        # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
-        logging.error(f"=====================================================\n")
+                    # logging.info(f"file_")
+
+        info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
+        logging.info(f'Average test 3-Pixel Error = {info_str}')
+
+        info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
+        
+        logging.error(f"=====================[BATCH {batch_idx} FINISHED]================================\n")
         
     #     log.info('[{}/{}] {}'.format(
     #         batch_idx, length_loader, info_str))
