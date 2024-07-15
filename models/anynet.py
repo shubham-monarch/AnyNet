@@ -15,7 +15,7 @@ class AnyNet(nn.Module):
         super(AnyNet, self).__init__()
 
         coloredlogs.install(level="INFO", force=True)  # install a handler on the root logger
-        logging.warning(f"[AnyNet.py] -> init called!")
+        # logging.warning(f"[AnyNet.py] -> init called!")
         self.init_channels = args.init_channels
         self.maxdisplist = args.maxdisplist
         self.spn_init_channels = args.spn_init_channels
@@ -128,8 +128,8 @@ class AnyNet(nn.Module):
 
     def forward(self, left, right):
         
-        logging.warning(f"[AnyNet.py] -> forward called!")
-        logging.info(f"[AnyNet.py] -> left.shape: {left.shape} right.shape: {right.shape}")
+        # logging.warning(f"[AnyNet.py] -> forward called!")
+        # logging.info(f"[AnyNet.py] -> left.shape: {left.shape} right.shape: {right.shape}")
         img_size = left.size()
 
         feats_l = self.feature_extraction(left)
@@ -180,9 +180,9 @@ class AnyNet(nn.Module):
             pred.append(nn.functional.interpolate(refine_flow, size=(img_size[2], img_size[3]), mode='bilinear', align_corners=False))
         
         # logging.info(f"[AnyNet.py] -> pred.shape: {pred.shape}")
-        logging.info(f"[AnyNey.py] -> len(pred): {len(pred)}")
-        for pred_ in pred: 
-            logging.info(f"[AnyNet.py] -> pred.shape: {pred_.shape} pred.dtype: {pred_.dtype}")
+        # logging.info(f"[AnyNey.py] -> len(pred): {len(pred)}")
+        # for pred_ in pred: 
+        #     logging.info(f"[AnyNet.py] -> pred.shape: {pred_.shape} pred.dtype: {pred_.dtype}")
         return pred
 
 class disparityregression2(nn.Module):

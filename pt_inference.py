@@ -16,6 +16,7 @@ import models.anynet
 from torchvision.utils import save_image
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 # custom imports
 import logging, coloredlogs
@@ -67,46 +68,52 @@ elif args.datatype == '2012':
 elif args.datatype == 'other':
     from dataloader import diy_dataset as ls
 
-
-INFERENCE_NO_SPN_FOLDER = "pt_inference_no_spn"
 GT_DISP_FOLDER = prep_dataset_finetune.VALIDATION_DISPARITY_FOLDER
+PT_INFERENCE_NO_SPN_DIR = "pt_inference_no_spn"
+HISTOGRAMS_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/histograms" 
 
 # TO-DO => 
-# - interpolate vs upsample
+# - interpolate vs upsample [undo this / research this]
 # - fix torchvision
 # - fix spn package
-# - visualize S1 vs S2 vs S3
+# - negative disparity
+# - go through git issues
+# - go through the paper once
+# - compare s1 vs s2 vs s3
+    # - accuracy not improving across stage
+    # - check if pre-trained model is loaded
+    # - check if there is a pytorch version issue while loading the pre-trained model 
 
-# def save_batch_images(output: torch.Tensor, stage: int, output_folder: str):s
-def save_batch_images(outputs, stage: int, output_folder: str):
+
+def tensorf32_to_histogram(output: torch.Tensor, output_dir: str, stage: int = None):
+    utils_anynet.delete_folders([output_dir])
+    utils_anynet.create_folders([output_dir])
+    
+    logging.info(f"[tensorf32_to_histogram] stage: {stage}")
+    output_np = output.cpu().numpy()
+    logging.info(f"[tensorf32_to_histogram] output_np.shape: {output_np.shape} output.shape: {output.shape}")
+    for i in range(output.shape[0]):
+        plt.figure()
+        # Flatten the image to get the distribution of all pixel values
+        img = output_np[i]
+        logging.info(f"[tensorf32_to_histogram] img.shape: {img.shape}")
+        img_flat = img.flatten()
+        logging.info(f"mx: {np.max(img_flat)} mn: {np.min(img_flat)}")
+        plt.hist(img_flat, bins=50, color='blue', alpha=0.7)
+        plt.title(f"Histogram for Image {i}")
+        plt.xlabel("Pixel Value")
+        plt.ylabel("Frequency")
+        
+        # Save the histogram
+        plt.savefig(f"{output_dir}/histogram_{i}_{stage}.png")
+        plt.close()
+    
+
+def tensorf32_to_png(output, stage: int, output_folder: str):
     
     utils_anynet.delete_folders([output_folder])
     utils_anynet.create_folders([output_folder])
-
-    logging.warning(f"outputs.shape: {outputs.shape}")
-    
-    for i, output in enumerate(outputs):
-        # Save each image as a PNG file
-        output = output.squeeze(0)
-        output = output * 255.0
-        # logging.info(f"output.shape: {output.shape}")
-        mn = torch.min(output)
-        mx = torch.max(output)
-        # logging.info(f"mn: {mn} mx: {mx}")
-
-        output_normalized = (output - mn) / (mx - mn)
-        output_normalized = output_normalized * 255.0   
-        # output_normalized = output_normalized.to(torch.uint8)
-
-        output_np = output_normalized.cpu().detach().numpy()
-
-        # Convert the data type to uint8
-        output_np_uint8 = np.clip(output_np, 0, 255).astype('uint8')
-
-        # Use OpenCV to write the image to a file
-        cv2.imwrite(f"{output_folder}/image_{i}_{stage}.png", output_np_uint8)
-        # save_image(output_normalized, os.path.join(output_folder, f"image_{i}.png"))
-
+    return
 
 def inference():
     global args
@@ -120,8 +127,6 @@ def inference():
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
-
-    # return
 
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
@@ -152,6 +157,7 @@ def inference():
     # length_loader = len(dataloader)
 
     # model.eval()
+
     for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
         
         logging.error(f"=====================================================")
@@ -171,25 +177,33 @@ def inference():
             logging.info(f"[before squeezing]")
             
             for stage, output in enumerate(outputs):
-                logging.warning(f"[Stage {stage}] type(output): {type(output)} output.shape: {output.shape}")
+                logging.warning(f"[Stage {stage}] output.dtype: {output.dtype} output.shape: {output.shape}")
             
-            logging.info("[after squeezing]")
+            # logging.info("[after squeezing]")
             for x in range(stages):
-                # output = torch.squeeze(outputs[x], 1)
+                # output = torch.squeeze(outpsuts[x], 1)
                 # D1s[x].update(error_estimating(output, disp_L).item())
                 # save_batch_images(output, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 # outputs_cpu = outputs[x].cpu()
                 # save_batch_images(outputs_cpu, stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
-                continue
-                save_batch_images(outputs[x], stage=x, output_folder= INFERENCE_NO_SPN_FOLDER)
                 logging.warning(f"[Stage {x}] output.dtype: {output.dtype} output.shape: {output.shape}")
-     
+                tensorf32_to_histogram(output, output_dir=HISTOGRAMS_NO_SPN_DIR, stage=x)
+        
+        
+        
         # info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
         # logging.info(f'Average test 3-Pixel Error = {info_str}')
 
         # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
         logging.error(f"=====================================================\n")
         
+    #     log.info('[{}/{}] {}'.format(
+    #         batch_idx, length_loader, info_str))
+
+    # info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
+    # log.info('Average test 3-Pixel Error = ' + info_str)
+   
+
 
 def error_estimating(disp, ground_truth, maxdisp=192):
     # logging.info("[error_estimating] -> entering")

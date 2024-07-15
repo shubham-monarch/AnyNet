@@ -29,7 +29,7 @@ class myImageFloder(data.Dataset):
     def __init__(self, left, right, left_disparity, training, loader=default_loader, dploader= disparity_loader):
         
         coloredlogs.install(level="INFO", force=True)  # install a handler on the root logger
-        logging.warning(f"[KITTILoader.py] -> init called!")  
+        # logging.warning(f"[KITTILoader.py] -> init called!")  
 
         self.left = left
         self.right = right

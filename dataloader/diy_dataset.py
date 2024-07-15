@@ -14,7 +14,7 @@ def is_image_file(filename):
 
 
 def dataloader(filepath, log, split_file):
-    logging.warning(f"DIY dataloader called!")
+    # logging.warning(f"DIY dataloader called!")
     
     left_fold = 'image_2/'
     right_fold = 'image_3/'
