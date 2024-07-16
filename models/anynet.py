@@ -172,10 +172,13 @@ class AnyNet(nn.Module):
             G1 = torch.div(G1, sum_abs + 1e-8)
             G2 = torch.div(G2, sum_abs + 1e-8)
             G3 = torch.div(G3, sum_abs + 1e-8)
+            
             pred_flow = nn.functional.upsample(pred[-1], (img_size[2]//4, img_size[3]//4), mode='bilinear')
             # pred_flow = nn.functional.interpolate(pred[-1], size=(img_size[2]//4, img_size[3]//4), mode='bilinear', align_corners=False)
+            
             refine_flow = self.spn_layer(self.refine_spn[1](pred_flow), G1, G2, G3)
             refine_flow = self.refine_spn[2](refine_flow)
+            
             pred.append(nn.functional.upsample(refine_flow, (img_size[2] , img_size[3]), mode='bilinear'))
             # pred.append(nn.functional.interpolate(refine_flow, size=(img_size[2], img_size[3]), mode='bilinear', align_corners=False))
         
