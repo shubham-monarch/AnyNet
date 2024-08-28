@@ -84,6 +84,7 @@ DISPARITY_IMAGES_NO_SPN_DIR = f"{PT_INFERENCE_NO_SPN_DIR}/disp"
 # - negative disparity
 # - go through git issues
 # - go through the paper once
+# - fix pytorch align_corner warning
 # - compare s1 vs s2 vs s3
     # - accuracy not improving across stage
     # - check if pre-trained model is loaded
@@ -120,11 +121,11 @@ def inference():
 
     model = models.anynet.AnyNet(args)
     model = nn.DataParallel(model).cuda()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+    # optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
     # log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
     if args.pretrained:
-        logging.error(f"args.pretrained: {args.pretrained}")
+        # logging.error(f"args.pretrained: {args.pretrained}")
         if os.path.isfile(args.pretrained):
             checkpoint = torch.load(args.pretrained)
             model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -147,13 +148,13 @@ def inference():
     # utils_anynet.create_folders([HISTOGRAMS_NO_SPN_DIR])
     
     # cv2.namedWindow("TEST", cv2.WINDOW_NORMAL)
-
+    # return
     for batch_idx, (path_l , path_r, path_disp, imgL, imgR, disp_L) in enumerate(TestImgLoader):
 
         batch_cutoff = 0        
         if batch_idx > batch_cutoff:
             break
-        logging.error(f"=====================[BATCH {batch_idx} STARTED]================================")
+        logging.warning(f"=====================[BATCH {batch_idx} STARTED]================================")
         # logging.warning(f"[{batch_idx}]")
         # logging.info(f"path_l: {path_l}")
         # logging.info(f"path_r: {path_r}")

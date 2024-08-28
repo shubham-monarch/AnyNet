@@ -4,6 +4,9 @@ import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
 
+import logging, coloredlogs
+coloredlogs.install(level="INFO", fmt="%(filename)s [%(lineno)d] -> %(message)s")
+
 def preconv2d(in_planes, out_planes, kernel_size, stride, pad, dilation=1, bn=True):
     if bn:
         return nn.Sequential(
@@ -20,6 +23,7 @@ class unetUp(nn.Module):
         super(unetUp, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
+        logging.warning(f"[submodules.py]: unetup --> __init__.py called!")
         if is_deconv:
             self.up = nn.Sequential(
                 nn.BatchNorm2d(in_size),

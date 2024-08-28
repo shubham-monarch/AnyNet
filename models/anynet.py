@@ -15,7 +15,7 @@ class AnyNet(nn.Module):
         super(AnyNet, self).__init__()
 
         coloredlogs.install(level="INFO", force=True)  # install a handler on the root logger
-        # logging.warning(f"[AnyNet.py] -> init called!")
+        logging.warning(f"==== [AnyNet.py] -> __init__ called! ====")
         self.init_channels = args.init_channels
         self.maxdisplist = args.maxdisplist
         self.spn_init_channels = args.spn_init_channels
@@ -24,6 +24,16 @@ class AnyNet(nn.Module):
         self.channels_3d = args.channels_3d
         self.growth_rate = args.growth_rate
         self.with_spn = args.with_spn
+        
+        logging.info(f"init_channels: {self.init_channels}")
+        logging.info(f"maxdisplist: {self.maxdisplist}")
+        logging.info(f"spn_init_channels: {self.spn_init_channels}")
+        logging.info(f"nblocks: {self.nblocks}")
+        logging.info(f"layers_3d: {self.layers_3d}")
+        logging.info(f"channels_3d: {self.channels_3d}")
+        logging.info(f"growth_rate: {self.growth_rate}")
+        logging.info(f"with_spn: {self.with_spn}")
+        
 
         if self.with_spn:
             try:
@@ -49,9 +59,11 @@ class AnyNet(nn.Module):
         else:
             self.refine_spn = None
 
+        logging.error("[anynet.py] BEFORE feature_extraction_conv")
         self.feature_extraction = feature_extraction_conv(self.init_channels,
                                       self.nblocks)
-
+        logging.error("[anynet.py] AFTER feature_extraction_conv")
+        
         self.volume_postprocess = []
 
         for i in range(3):
